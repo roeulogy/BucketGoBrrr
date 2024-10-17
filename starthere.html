@@ -34,8 +34,15 @@
         button:hover {
             background-color: #0056b3;
         }
-        .result {
+        .result, .variation-container {
             margin-top: 20px;
+        }
+        .variation {
+            display: flex;
+            justify-content: space-between;
+        }
+        .variation label {
+            width: 50%;
         }
     </style>
 </head>
@@ -45,16 +52,12 @@
     <h1>Lottery Ticket Odds Calculator</h1>
 
     <label for="totalTickets">Total Number of Tickets (X):</label>
-    <input type="number" id="totalTickets" placeholder="Enter total number of tickets">
+    <input type="number" id="totalTickets" placeholder="Enter total number of tickets" min="1">
 
     <label for="ticketVariations">Number of Ticket Variations (Y):</label>
-    <input type="number" id="ticketVariations" placeholder="Enter number of ticket variations">
+    <input type="number" id="ticketVariations" placeholder="Enter number of ticket variations" min="1" oninput="generateVariationFields()">
 
-    <label for="remainingTickets">Remaining Number of Tickets:</label>
-    <input type="number" id="remainingTickets" placeholder="Enter remaining number of tickets">
-
-    <label for="ticketsOpened">Tickets Already Pulled:</label>
-    <input type="number" id="ticketsOpened" placeholder="Enter number of tickets opened (optional)" value="0">
+    <div id="variationContainer" class="variation-container"></div>
 
     <button onclick="calculateOdds()">Calculate Odds</button>
 
@@ -72,39 +75,85 @@
     let ticketVariations;
     let remainingTickets;
     let ticketsOpened = 0;
+    let variations = {};
+
+    function generateVariationFields() {
+        const variationContainer = document.getElementById('variationContainer');
+        variationContainer.innerHTML = ''; // Clear previous fields
+
+        ticketVariations = parseInt(document.getElementById('ticketVariations').value);
+        if (isNaN(ticketVariations) || ticketVariations <= 0) return;
+
+        for (let i = 1; i <= ticketVariations; i++) {
+            const variationDiv = document.createElement('div');
+            variationDiv.classList.add('variation');
+
+            variationDiv.innerHTML = `
+                <label for="variation${i}">Variation ${i} Name:</label>
+                <input type="text" id="variation${i}Name" placeholder="Variation ${i} Name">
+                <label for="variation${i}Value">Variation ${i} Count:</label>
+                <input type="number" id="variation${i}Value" placeholder="Count" min="1">
+            `;
+            variationContainer.appendChild(variationDiv);
+        }
+    }
 
     function calculateOdds() {
         totalTickets = parseInt(document.getElementById('totalTickets').value);
-        ticketVariations = parseInt(document.getElementById('ticketVariations').value);
-        remainingTickets = parseInt(document.getElementById('remainingTickets').value);
-        ticketsOpened = parseInt(document.getElementById('ticketsOpened').value);
+        remainingTickets = totalTickets - ticketsOpened;
 
-        if (isNaN(totalTickets) || isNaN(ticketVariations) || isNaN(remainingTickets) || isNaN(ticketsOpened)) {
-            document.getElementById('result').innerHTML = "Please enter valid values for all fields.";
+        if (isNaN(totalTickets) || totalTickets <= 0 || isNaN(remainingTickets) || remainingTickets <= 0) {
+            document.getElementById('result').innerHTML = "Please enter valid values for total and remaining tickets.";
             return;
         }
 
-        let remainingTypes = ticketVariations - ticketsOpened;
-        let odds = remainingTypes / remainingTickets;
+        variations = {}; // Reset variations object
+        let totalVariationTickets = 0;
 
-        document.getElementById('result').innerHTML = `Odds of pulling a specific ticket: 1 in ${Math.round(1 / odds)} (${(odds * 100).toFixed(2)}%)`;
+        for (let i = 1; i <= ticketVariations; i++) {
+            const variationName = document.getElementById(`variation${i}Name`).value;
+            const variationValue = parseInt(document.getElementById(`variation${i}Value`).value);
+
+            if (!variationName || isNaN(variationValue) || variationValue <= 0) {
+                document.getElementById('result').innerHTML = "Please enter valid names and counts for all variations.";
+                return;
+            }
+
+            variations[variationName] = variationValue;
+            totalVariationTickets += variationValue;
+        }
+
+        if (totalVariationTickets > totalTickets) {
+            document.getElementById('result').innerHTML = "The total number of tickets in variations exceeds the total number of tickets!";
+            return;
+        }
+
+        let resultHTML = '<h3>Odds of pulling each variation:</h3><ul>';
+        for (let variation in variations) {
+            const variationOdds = variations[variation] / remainingTickets;
+            resultHTML += `<li>${variation}: 1 in ${Math.round(1 / variationOdds)} (${(variationOdds * 100).toFixed(2)}%)</li>`;
+        }
+        resultHTML += '</ul>';
+        document.getElementById('result').innerHTML = resultHTML;
     }
 
     function openTicket() {
         let openedTicket = document.getElementById('openedTicket').value;
-        if (!openedTicket) {
+        if (!openedTicket || !variations[openedTicket]) {
             alert("Please enter a valid ticket type.");
             return;
         }
 
-        ticketsOpened++;
-        remainingTickets--;
+        if (variations[openedTicket] > 0) {
+            variations[openedTicket]--;
+            ticketsOpened++;
+            remainingTickets--;
 
-        document.getElementById('ticketsOpened').value = ticketsOpened;
-        document.getElementById('remainingTickets').value = remainingTickets;
-
-        calculateOdds(); // Recalculate the odds with updated values
-        document.getElementById('openedTicket').value = ""; // Clear input for the next ticket
+            calculateOdds(); // Recalculate the odds with updated values
+            document.getElementById('openedTicket').value = ""; // Clear input for the next ticket
+        } else {
+            alert("No more tickets of this type remaining!");
+        }
     }
 </script>
 
